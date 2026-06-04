@@ -1,0 +1,1025 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gradient Logit Steering Trace</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f5f7fa;
+      --panel: #ffffff;
+      --panel-2: #f0f4f8;
+      --line: #d7dee8;
+      --line-strong: #aebacc;
+      --text: #1f2933;
+      --muted: #627084;
+      --accent: #2b6cb0;
+      --accent-2: #0f766e;
+      --danger: #b42318;
+      --warn: #b7791f;
+      --good: #2f855a;
+      --chip: #e8eef6;
+      --focus: #fff4cc;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 14px;
+      letter-spacing: 0;
+    }
+
+    button,
+    input,
+    select {
+      font: inherit;
+    }
+
+    button {
+      border: 1px solid var(--line-strong);
+      background: #ffffff;
+      color: var(--text);
+      border-radius: 6px;
+      padding: 7px 10px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.55;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    .app {
+      min-height: 100vh;
+      display: grid;
+      grid-template-rows: auto 1fr;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--line);
+      background: #ffffff;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 18px;
+      line-height: 1.2;
+      font-weight: 700;
+    }
+
+    h2 {
+      margin: 0 0 10px;
+      font-size: 15px;
+      line-height: 1.2;
+    }
+
+    h3 {
+      margin: 0 0 8px;
+      font-size: 13px;
+      line-height: 1.2;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0;
+    }
+
+    .header-meta {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+      color: var(--muted);
+      font-size: 13px;
+      justify-content: flex-end;
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+      min-height: 0;
+    }
+
+    aside {
+      border-right: 1px solid var(--line);
+      background: #ffffff;
+      min-width: 0;
+      overflow: auto;
+      padding: 16px;
+    }
+
+    .workspace {
+      min-width: 0;
+      overflow: auto;
+      padding: 16px;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+      margin-bottom: 14px;
+    }
+
+    .control-grid {
+      display: grid;
+      grid-template-columns: 40px minmax(0, 1fr) 40px;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .field-row {
+      display: grid;
+      grid-template-columns: 118px minmax(0, 1fr);
+      gap: 8px;
+      align-items: center;
+      margin-top: 10px;
+    }
+
+    .field-row label {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .field-row select {
+      min-width: 0;
+      border: 1px solid var(--line-strong);
+      border-radius: 6px;
+      padding: 7px 8px;
+      background: #ffffff;
+      color: var(--text);
+    }
+
+    .step-readout {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .metric {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 8px;
+      background: var(--panel-2);
+      min-height: 58px;
+    }
+
+    .metric .label {
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 4px;
+    }
+
+    .metric .value {
+      font-family: var(--mono);
+      font-size: 14px;
+      overflow-wrap: anywhere;
+    }
+
+    .token-stream {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      align-content: flex-start;
+      max-height: 330px;
+      overflow: auto;
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fbfcfe;
+    }
+
+    .token {
+      border: 1px solid transparent;
+      background: var(--chip);
+      border-radius: 5px;
+      padding: 4px 6px;
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.2;
+      white-space: pre-wrap;
+      min-height: 24px;
+      max-width: 100%;
+      overflow-wrap: anywhere;
+      cursor: pointer;
+    }
+
+    .token.prompt {
+      background: #eef2f7;
+      color: var(--muted);
+      cursor: default;
+    }
+
+    .token.current {
+      background: #dbeafe;
+      border-color: var(--accent);
+      color: #123a63;
+    }
+
+    .token.selected {
+      outline: 2px solid var(--warn);
+      outline-offset: 1px;
+    }
+
+    .token.shifted {
+      box-shadow: inset 0 -3px 0 rgba(180, 35, 24, 0.28);
+    }
+
+    .table-wrap {
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 560px;
+      background: #ffffff;
+    }
+
+    th,
+    td {
+      text-align: left;
+      padding: 8px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+
+    th {
+      background: var(--panel-2);
+      color: var(--muted);
+      font-weight: 650;
+      font-size: 12px;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+
+    td.num,
+    th.num {
+      text-align: right;
+      font-family: var(--mono);
+      white-space: nowrap;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .position-list {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .position-button {
+      font-family: var(--mono);
+      min-width: 72px;
+      background: #fbfcfe;
+    }
+
+    .position-button.active {
+      border-color: var(--accent);
+      background: #dbeafe;
+      color: #123a63;
+    }
+
+    .chart {
+      width: 100%;
+      height: 170px;
+      display: block;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #ffffff;
+    }
+
+    .heatmap {
+      width: 100%;
+      height: 140px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #ffffff;
+      display: block;
+      cursor: crosshair;
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .mono {
+      font-family: var(--mono);
+    }
+
+    .summary-text {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .status-line {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .pill {
+      border: 1px solid var(--line);
+      background: var(--panel-2);
+      border-radius: 999px;
+      padding: 4px 8px;
+      white-space: nowrap;
+    }
+
+    .delta-pos {
+      color: var(--good);
+    }
+
+    .delta-neg {
+      color: var(--danger);
+    }
+
+    .empty {
+      color: var(--muted);
+      padding: 12px;
+      border: 1px dashed var(--line-strong);
+      border-radius: 6px;
+      background: #fbfcfe;
+    }
+
+    @media (max-width: 980px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+
+      aside {
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .grid-2,
+      .grid-3 {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>Gradient Logit Steering Trace</h1>
+      <div class="header-meta" id="headerMeta"></div>
+    </header>
+
+    <main>
+      <aside>
+        <section class="panel">
+          <h2>Step</h2>
+          <div class="control-grid">
+            <button id="prevStep" aria-label="Previous step">Prev</button>
+            <input id="stepSlider" type="range" min="0" value="0" step="1">
+            <button id="nextStep" aria-label="Next step">Next</button>
+          </div>
+          <div class="field-row">
+            <label for="detailStepSelect">Logit detail step</label>
+            <select id="detailStepSelect"></select>
+          </div>
+          <div class="step-readout">
+            <div class="metric">
+              <div class="label">Step</div>
+              <div class="value" id="stepValue"></div>
+            </div>
+            <div class="metric">
+              <div class="label">Risk Loss</div>
+              <div class="value" id="riskValue"></div>
+            </div>
+            <div class="metric">
+              <div class="label">rho / weight</div>
+              <div class="value" id="rhoValue"></div>
+            </div>
+            <div class="metric">
+              <div class="label">Max |Shift|</div>
+              <div class="value" id="shiftValue"></div>
+            </div>
+          </div>
+          <div class="status-line" id="stepStatus"></div>
+        </section>
+
+        <section class="panel">
+          <h2>Generation</h2>
+          <p class="summary-text" id="generationSummary"></p>
+          <div class="token-stream" id="tokenStream"></div>
+        </section>
+      </aside>
+
+      <section class="workspace">
+        <div class="grid-2">
+          <section class="panel">
+            <h2>Risk And Logit Shift</h2>
+            <svg class="chart" id="riskChart" role="img"></svg>
+          </section>
+          <section class="panel">
+            <h2>Shift Heatmap</h2>
+            <canvas class="heatmap" id="shiftHeatmap" width="900" height="220"></canvas>
+            <div class="status-line" id="heatmapStatus"></div>
+          </section>
+        </div>
+
+        <section class="panel">
+          <h2>Selected Step</h2>
+          <div class="grid-3">
+            <div class="metric">
+              <div class="label">Generated Token</div>
+              <div class="value" id="selectedToken"></div>
+            </div>
+            <div class="metric">
+              <div class="label">Token Position</div>
+              <div class="value" id="selectedPosition"></div>
+            </div>
+            <div class="metric">
+              <div class="label">Confidence</div>
+              <div class="value" id="selectedConfidence"></div>
+            </div>
+          </div>
+          <div class="status-line" id="selectedStepNotes"></div>
+        </section>
+
+        <section class="panel">
+          <h2>Position Details</h2>
+          <div class="position-list" id="positionList"></div>
+          <div class="status-line" id="positionStatus"></div>
+        </section>
+
+        <div class="grid-2">
+          <section class="panel">
+            <h2>Original vs Shifted Logits</h2>
+            <div class="table-wrap">
+              <table id="logitTable"></table>
+            </div>
+          </section>
+          <section class="panel">
+            <h2>Gradient Logit Delta</h2>
+            <div class="table-wrap">
+              <table id="deltaTable"></table>
+            </div>
+          </section>
+        </div>
+
+        <section class="panel">
+          <h2>Record Metadata</h2>
+          <div class="grid-3">
+            <div class="metric">
+              <div class="label">Generation Config</div>
+              <div class="value" id="generationConfig"></div>
+            </div>
+            <div class="metric">
+              <div class="label">Control Config</div>
+              <div class="value" id="controlConfig"></div>
+            </div>
+            <div class="metric">
+              <div class="label">Record</div>
+              <div class="value" id="recordConfig"></div>
+            </div>
+          </div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <script src="./record.js"></script>
+  <script>
+    const record = window.GRADIENT_LOGITS_RECORD;
+    const steps = record.steps || [];
+    const genLength = Number(record.generation_config.gen_length);
+    const detailStepIndexes = steps
+      .map((step, index) => ({step, index}))
+      .filter(({step}) => (step.focused_positions || []).length > 0 || Number(step.max_abs_shift || 0) > 0)
+      .map(({index}) => index);
+    const promptTokens = tokenizeForDisplay(record.prompt || "");
+    const generatedTokens = buildGeneratedTokens(steps);
+    const promptTokenLength = inferPromptTokenLength(generatedTokens);
+    const state = {
+      step: 0,
+      selectedPositionKey: null,
+    };
+
+    const el = {
+      headerMeta: document.getElementById("headerMeta"),
+      stepSlider: document.getElementById("stepSlider"),
+      prevStep: document.getElementById("prevStep"),
+      nextStep: document.getElementById("nextStep"),
+      detailStepSelect: document.getElementById("detailStepSelect"),
+      stepValue: document.getElementById("stepValue"),
+      riskValue: document.getElementById("riskValue"),
+      rhoValue: document.getElementById("rhoValue"),
+      shiftValue: document.getElementById("shiftValue"),
+      stepStatus: document.getElementById("stepStatus"),
+      generationSummary: document.getElementById("generationSummary"),
+      tokenStream: document.getElementById("tokenStream"),
+      riskChart: document.getElementById("riskChart"),
+      shiftHeatmap: document.getElementById("shiftHeatmap"),
+      heatmapStatus: document.getElementById("heatmapStatus"),
+      selectedToken: document.getElementById("selectedToken"),
+      selectedPosition: document.getElementById("selectedPosition"),
+      selectedConfidence: document.getElementById("selectedConfidence"),
+      selectedStepNotes: document.getElementById("selectedStepNotes"),
+      positionList: document.getElementById("positionList"),
+      positionStatus: document.getElementById("positionStatus"),
+      logitTable: document.getElementById("logitTable"),
+      deltaTable: document.getElementById("deltaTable"),
+      generationConfig: document.getElementById("generationConfig"),
+      controlConfig: document.getElementById("controlConfig"),
+      recordConfig: document.getElementById("recordConfig"),
+    };
+
+    init();
+
+    function init() {
+      if (!record || !steps.length) {
+        document.body.innerHTML = "<main class='workspace'><div class='empty'>No trace record was loaded.</div></main>";
+        return;
+      }
+
+      el.stepSlider.max = String(steps.length - 1);
+      el.headerMeta.innerHTML = [
+        `sample ${escapeHtml(record.sample_index)}`,
+        `${steps.length} steps`,
+        `${record.generation_config.gen_length} generated tokens`,
+        `${record.control_config.method}`,
+      ].map((x) => `<span>${x}</span>`).join("");
+
+      el.generationSummary.textContent = `${generatedTokens.length} response tokens recorded. Click a token to jump to the step that revealed it.`;
+      el.generationConfig.textContent = compactConfig(record.generation_config, ["steps", "gen_length", "block_length", "temperature"]);
+      el.controlConfig.textContent = compactConfig(record.control_config, ["eta", "safety_margin", "weight_schedule", "grad_every_k"]);
+      el.recordConfig.textContent = `schema ${record.record_schema_version || "?"}, ${formatBytes(JSON.stringify(record).length)}`;
+
+      renderTokenStream();
+      renderDetailStepSelect();
+      renderRiskChart();
+      renderHeatmap();
+      attachEvents();
+      setStep(detailStepIndexes[0] || 0);
+    }
+
+    function attachEvents() {
+      el.stepSlider.addEventListener("input", () => setStep(Number(el.stepSlider.value)));
+      el.prevStep.addEventListener("click", () => setStep(Math.max(0, state.step - 1)));
+      el.nextStep.addEventListener("click", () => setStep(Math.min(steps.length - 1, state.step + 1)));
+      el.detailStepSelect.addEventListener("change", () => {
+        if (el.detailStepSelect.value !== "") setStep(Number(el.detailStepSelect.value));
+      });
+      el.shiftHeatmap.addEventListener("click", (event) => {
+        const rect = el.shiftHeatmap.getBoundingClientRect();
+        const x = (event.clientX - rect.left) / rect.width;
+        const step = Math.round(x * (steps.length - 1));
+        setStep(clamp(step, 0, steps.length - 1));
+      });
+    }
+
+    function setStep(stepIndex, preferredPositionKey = null) {
+      state.step = clamp(stepIndex, 0, steps.length - 1);
+      el.stepSlider.value = String(state.step);
+      const step = steps[state.step];
+      const details = getStepDetails(step);
+      const transferredDetail = details.find((d) => d.transferred) || details.find((d) => String(d.detail_kind || "").includes("transferred"));
+      state.selectedPositionKey = preferredPositionKey || positionKey(transferredDetail || details[0]);
+      el.detailStepSelect.value = detailStepIndexes.includes(state.step) ? String(state.step) : "";
+
+      renderStepMetrics(step);
+      renderTokenHighlights(step);
+      renderSelectedStep(step);
+      renderPositionList(step, details);
+      renderTables(getSelectedDetail(details));
+      updateChartCursor();
+      renderHeatmapCursor();
+    }
+
+    function renderDetailStepSelect() {
+      if (!detailStepIndexes.length) {
+        el.detailStepSelect.innerHTML = "<option value=''>No logits detail</option>";
+        el.detailStepSelect.disabled = true;
+        return;
+      }
+
+      el.detailStepSelect.innerHTML = [
+        "<option value=''>Current step has no detail</option>",
+        ...detailStepIndexes.map((index) => {
+          const step = steps[index];
+          const label = `step ${index} | risk ${formatNum(step.risk_loss)} | shift ${formatNum(step.max_abs_shift)}`;
+          return `<option value="${index}">${escapeHtml(label)}</option>`;
+        }),
+      ].join("");
+    }
+
+    function renderStepMetrics(step) {
+      el.stepValue.textContent = `${state.step} / ${steps.length - 1}`;
+      el.riskValue.textContent = formatNum(step.risk_loss);
+      el.rhoValue.textContent = `${formatNum(step.rho)} / ${formatNum(step.weight)}`;
+      el.shiftValue.textContent = formatNum(step.max_abs_shift);
+      el.prevStep.disabled = state.step <= 0;
+      el.nextStep.disabled = state.step >= steps.length - 1;
+
+      const transferred = step.transferred_positions || [];
+      const shifted = step.position_shift_summary || [];
+      el.stepStatus.innerHTML = [
+        pill(`${transferred.length} revealed`),
+        pill(`${shifted.length} shifted positions`),
+        pill(step.is_grad_step ? "gradient step" : "reused gradient"),
+      ].join("");
+    }
+
+    function renderSelectedStep(step) {
+      const transferred = (step.transferred_positions || [])[0];
+      if (!transferred) {
+        el.selectedToken.textContent = "none";
+        el.selectedPosition.textContent = "none";
+        el.selectedConfidence.textContent = "none";
+        el.selectedStepNotes.innerHTML = "";
+        return;
+      }
+
+      el.selectedToken.textContent = tokenLabel(transferred);
+      el.selectedPosition.textContent = `response ${transferred.response_position}`;
+      el.selectedConfidence.textContent = formatNum(transferred.confidence);
+      el.selectedStepNotes.innerHTML = [
+        pill(`absolute ${transferred.absolute_position}`),
+        pill(`token id ${transferred.token_id}`),
+      ].join("");
+    }
+
+    function renderPositionList(step, details) {
+      if (!details.length) {
+        el.positionList.innerHTML = "<div class='empty'>No detailed logits were recorded for this step.</div>";
+        el.positionStatus.innerHTML = "";
+        return;
+      }
+
+      el.positionList.innerHTML = details.map((detail) => {
+        const key = positionKey(detail);
+        const active = key === state.selectedPositionKey ? " active" : "";
+        const kind = detail.transferred ? "revealed" : (detail.detail_kind || "shift");
+        return `<button class="position-button${active}" data-position-key="${escapeAttr(key)}">pos ${detail.response_position}<br>${escapeHtml(kind)}</button>`;
+      }).join("");
+
+      for (const button of el.positionList.querySelectorAll("button")) {
+        button.addEventListener("click", () => {
+          state.selectedPositionKey = button.dataset.positionKey;
+          renderPositionList(step, details);
+          renderTables(getSelectedDetail(details));
+        });
+      }
+
+      const selected = getSelectedDetail(details);
+      el.positionStatus.innerHTML = selected ? [
+        pill(`mean |shift| ${formatNum(selected.mean_abs_shift)}`),
+        pill(`max |shift| ${formatNum(selected.max_abs_shift)}`),
+        selected.transferred ? pill("revealed this step") : "",
+      ].join("") : "";
+    }
+
+    function renderTables(detail) {
+      if (!detail) {
+        el.logitTable.innerHTML = emptyTable("No position selected.");
+        el.deltaTable.innerHTML = emptyTable("No position selected.");
+        return;
+      }
+      renderLogitTable(detail);
+      renderDeltaTable(detail);
+    }
+
+    function renderLogitTable(detail) {
+      const base = indexByToken(detail.top_base_logits || [], "logit");
+      const shifted = indexByToken(detail.top_shifted_logits || [], "logit");
+      const ids = unique([
+        ...(detail.top_base_logits || []).map((x) => x.token_id),
+        ...(detail.top_shifted_logits || []).map((x) => x.token_id),
+      ]).slice(0, 30);
+
+      const rows = ids.map((id) => {
+        const b = base.get(String(id));
+        const s = shifted.get(String(id));
+        const label = tokenLabel(b || s || {token_id: id, token_text: ""});
+        const delta = b && s ? s.value - b.value : null;
+        return `<tr>
+          <td>${escapeHtml(label)}</td>
+          <td class="num">${b ? formatNum(b.value) : ""}</td>
+          <td class="num">${s ? formatNum(s.value) : ""}</td>
+          <td class="num ${deltaClass(delta)}">${delta === null ? "" : formatSigned(delta)}</td>
+        </tr>`;
+      }).join("");
+
+      el.logitTable.innerHTML = `<thead><tr>
+        <th>Token</th><th class="num">Original</th><th class="num">Shifted</th><th class="num">Delta</th>
+      </tr></thead><tbody>${rows}</tbody>`;
+    }
+
+    function renderDeltaTable(detail) {
+      const positive = (detail.top_positive_shift || []).slice(0, 12).map((x) => ({...x, direction: "up"}));
+      const negative = (detail.top_negative_shift || []).slice(0, 12).map((x) => ({...x, direction: "down"}));
+      const rows = [...positive, ...negative].map((item) => `<tr>
+        <td>${item.direction === "up" ? "increase" : "decrease"}</td>
+        <td>${escapeHtml(tokenLabel(item))}</td>
+        <td class="num ${deltaClass(item.shift)}">${formatSigned(item.shift)}</td>
+      </tr>`).join("");
+
+      el.deltaTable.innerHTML = `<thead><tr>
+        <th>Direction</th><th>Token</th><th class="num">Logit Delta</th>
+      </tr></thead><tbody>${rows}</tbody>`;
+    }
+
+    function renderTokenStream() {
+      const promptHtml = promptTokens.map((token) => `<span class="token prompt">${escapeHtml(token)}</span>`).join("");
+      const genHtml = generatedTokens.map((token) => `<button class="token" data-step="${token.step}" data-position="${token.response_position}">${escapeHtml(token.token_text || "")}</button>`).join("");
+      el.tokenStream.innerHTML = promptHtml + genHtml;
+      for (const token of el.tokenStream.querySelectorAll("button.token")) {
+        token.addEventListener("click", () => {
+          const step = Number(token.dataset.step);
+          const pos = Number(token.dataset.position);
+          setStep(step, `0:${promptTokenLength + pos}`);
+        });
+      }
+    }
+
+    function renderTokenHighlights(step) {
+      const currentPositions = new Set((step.transferred_positions || []).map((x) => String(x.response_position)));
+      const shiftedPositions = new Set((step.position_shift_summary || []).map((x) => String(x.response_position)));
+      for (const token of el.tokenStream.querySelectorAll("button.token")) {
+        token.classList.toggle("current", token.dataset.step === String(state.step));
+        token.classList.toggle("selected", currentPositions.has(token.dataset.position));
+        token.classList.toggle("shifted", shiftedPositions.has(token.dataset.position));
+      }
+    }
+
+    function renderRiskChart() {
+      const width = 900;
+      const height = 170;
+      const pad = {left: 42, right: 16, top: 14, bottom: 28};
+      const risk = steps.map((s) => Number(s.risk_loss || 0));
+      const shift = steps.map((s) => Number(s.max_abs_shift || 0));
+      const yMax = Math.max(max(risk), max(shift), 1e-6);
+      const x = (i) => pad.left + i / Math.max(steps.length - 1, 1) * (width - pad.left - pad.right);
+      const y = (v) => height - pad.bottom - v / yMax * (height - pad.top - pad.bottom);
+      const line = (values) => values.map((v, i) => `${x(i).toFixed(2)},${y(v).toFixed(2)}`).join(" ");
+
+      el.riskChart.setAttribute("viewBox", `0 0 ${width} ${height}`);
+      el.riskChart.innerHTML = `
+        <line x1="${pad.left}" y1="${height - pad.bottom}" x2="${width - pad.right}" y2="${height - pad.bottom}" stroke="#aebacc" />
+        <line x1="${pad.left}" y1="${pad.top}" x2="${pad.left}" y2="${height - pad.bottom}" stroke="#aebacc" />
+        <polyline points="${line(risk)}" fill="none" stroke="#2b6cb0" stroke-width="2" />
+        <polyline points="${line(shift)}" fill="none" stroke="#b42318" stroke-width="2" />
+        <line id="chartCursor" x1="${pad.left}" y1="${pad.top}" x2="${pad.left}" y2="${height - pad.bottom}" stroke="#1f2933" stroke-width="1" stroke-dasharray="4 4" />
+        <text x="${pad.left}" y="12" fill="#627084" font-size="11">risk loss</text>
+        <text x="${pad.left + 86}" y="12" fill="#b42318" font-size="11">max |shift|</text>
+        <text x="${width - pad.right - 90}" y="${height - 8}" fill="#627084" font-size="11">step</text>
+      `;
+      el.riskChart.dataset.width = String(width);
+      el.riskChart.dataset.left = String(pad.left);
+      el.riskChart.dataset.right = String(pad.right);
+    }
+
+    function updateChartCursor() {
+      const cursor = el.riskChart.querySelector("#chartCursor");
+      if (!cursor) return;
+      const width = Number(el.riskChart.dataset.width);
+      const left = Number(el.riskChart.dataset.left);
+      const right = Number(el.riskChart.dataset.right);
+      const x = left + state.step / Math.max(steps.length - 1, 1) * (width - left - right);
+      cursor.setAttribute("x1", String(x));
+      cursor.setAttribute("x2", String(x));
+    }
+
+    function renderHeatmap() {
+      const canvas = el.shiftHeatmap;
+      const ctx = canvas.getContext("2d");
+      const width = canvas.width;
+      const height = canvas.height;
+      ctx.clearRect(0, 0, width, height);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, width, height);
+
+      const values = [];
+      for (const step of steps) {
+        for (const item of step.position_shift_summary || []) {
+          values.push(Number(item.max_abs_shift || 0));
+        }
+      }
+      const valueMax = Math.max(max(values), 1e-6);
+      const cellW = width / steps.length;
+      const cellH = height / genLength;
+
+      for (const step of steps) {
+        for (const item of step.position_shift_summary || []) {
+          const x = step.step * cellW;
+          const y = height - (item.response_position + 1) * cellH;
+          ctx.fillStyle = heatColor(Number(item.max_abs_shift || 0) / valueMax);
+          ctx.fillRect(x, y, Math.max(1, cellW + 0.4), Math.max(1, cellH + 0.4));
+        }
+      }
+
+      el.heatmapStatus.innerHTML = [
+        pill(`positions 0-${genLength - 1}`),
+        pill(`max ${formatNum(valueMax)}`),
+      ].join("");
+      renderHeatmapCursor();
+    }
+
+    function renderHeatmapCursor() {
+      const canvas = el.shiftHeatmap;
+      const ctx = canvas.getContext("2d");
+      renderHeatmapBaseOnly(ctx, canvas.width, canvas.height);
+      const x = state.step / Math.max(steps.length - 1, 1) * canvas.width;
+      ctx.strokeStyle = "#1f2933";
+      ctx.setLineDash([5, 4]);
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, canvas.height);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    function renderHeatmapBaseOnly(ctx, width, height) {
+      ctx.clearRect(0, 0, width, height);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, width, height);
+      const values = [];
+      for (const step of steps) {
+        for (const item of step.position_shift_summary || []) {
+          values.push(Number(item.max_abs_shift || 0));
+        }
+      }
+      const valueMax = Math.max(max(values), 1e-6);
+      const cellW = width / steps.length;
+      const cellH = height / genLength;
+      for (const step of steps) {
+        for (const item of step.position_shift_summary || []) {
+          const x = step.step * cellW;
+          const y = height - (item.response_position + 1) * cellH;
+          ctx.fillStyle = heatColor(Number(item.max_abs_shift || 0) / valueMax);
+          ctx.fillRect(x, y, Math.max(1, cellW + 0.4), Math.max(1, cellH + 0.4));
+        }
+      }
+    }
+
+    function getStepDetails(step) {
+      return (step.focused_positions || []).slice().sort((a, b) => {
+        const aTransferred = a.transferred ? 1 : 0;
+        const bTransferred = b.transferred ? 1 : 0;
+        if (aTransferred !== bTransferred) return bTransferred - aTransferred;
+        return Number(b.max_abs_shift || 0) - Number(a.max_abs_shift || 0);
+      });
+    }
+
+    function getSelectedDetail(details) {
+      if (!details.length) return null;
+      return details.find((detail) => positionKey(detail) === state.selectedPositionKey) || details[0];
+    }
+
+    function buildGeneratedTokens(allSteps) {
+      const tokens = [];
+      for (const step of allSteps) {
+        for (const item of step.transferred_positions || []) {
+          tokens.push({...item, step: step.step});
+        }
+      }
+      return tokens.sort((a, b) => Number(a.response_position) - Number(b.response_position));
+    }
+
+    function inferPromptTokenLength(tokens) {
+      if (!tokens.length) return 0;
+      const first = tokens[0];
+      return Number(first.absolute_position) - Number(first.response_position);
+    }
+
+    function tokenizeForDisplay(text) {
+      return String(text || "").match(/\s+|\S+/g) || [];
+    }
+
+    function tokenLabel(entry) {
+      const text = String(entry.token_text || "").replace(/\n/g, "\\n").replace(/\t/g, "\\t");
+      return `${text || "<empty>"} #${entry.token_id}`;
+    }
+
+    function positionKey(detail) {
+      if (!detail) return null;
+      return `${detail.batch_index || 0}:${detail.absolute_position}`;
+    }
+
+    function indexByToken(entries, valueKey) {
+      const map = new Map();
+      for (const entry of entries || []) {
+        map.set(String(entry.token_id), {entry, value: Number(entry[valueKey])});
+      }
+      return map;
+    }
+
+    function unique(values) {
+      return [...new Set(values.map(String))];
+    }
+
+    function compactConfig(config, keys) {
+      return keys.map((key) => `${key}=${config[key]}`).join(", ");
+    }
+
+    function heatColor(t) {
+      const clamped = clamp(t, 0, 1);
+      const r = Math.round(245 - 12 * clamped);
+      const g = Math.round(247 - 132 * clamped);
+      const b = Math.round(250 - 138 * clamped);
+      return `rgb(${r},${g},${b})`;
+    }
+
+    function max(values) {
+      return values.length ? Math.max(...values) : 0;
+    }
+
+    function clamp(value, min, maxValue) {
+      return Math.max(min, Math.min(maxValue, value));
+    }
+
+    function formatNum(value) {
+      if (value === null || value === undefined || Number.isNaN(Number(value))) return "n/a";
+      const number = Number(value);
+      if (Math.abs(number) >= 100) return number.toFixed(1);
+      if (Math.abs(number) >= 10) return number.toFixed(2);
+      if (Math.abs(number) >= 1) return number.toFixed(3);
+      return number.toFixed(5);
+    }
+
+    function formatSigned(value) {
+      if (value === null || value === undefined) return "";
+      const number = Number(value);
+      return `${number >= 0 ? "+" : ""}${formatNum(number)}`;
+    }
+
+    function formatBytes(bytes) {
+      if (bytes < 1024) return `${bytes} B`;
+      if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+      return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+    }
+
+    function deltaClass(value) {
+      if (value === null || value === undefined) return "";
+      return Number(value) >= 0 ? "delta-pos" : "delta-neg";
+    }
+
+    function pill(text) {
+      return text ? `<span class="pill">${escapeHtml(text)}</span>` : "";
+    }
+
+    function emptyTable(text) {
+      return `<tbody><tr><td>${escapeHtml(text)}</td></tr></tbody>`;
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function escapeAttr(value) {
+      return escapeHtml(value).replace(/`/g, "&#096;");
+    }
+  </script>
+</body>
+</html>
