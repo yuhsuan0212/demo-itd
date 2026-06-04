@@ -236,6 +236,12 @@
       cursor: default;
     }
 
+    .token.mask {
+      background: #ffffff;
+      border-color: var(--line);
+      color: var(--muted);
+    }
+
     .token.current {
       background: #dbeafe;
       border-color: var(--accent);
@@ -591,7 +597,6 @@
       el.controlConfig.textContent = compactConfig(record.control_config, ["eta", "safety_margin", "weight_schedule", "grad_every_k"]);
       el.recordConfig.textContent = `schema ${record.record_schema_version || "?"}, ${formatBytes(JSON.stringify(record).length)}`;
 
-      renderTokenStream();
       renderDetailStepSelect();
       renderRiskChart();
       renderHeatmap();
@@ -624,7 +629,7 @@
       el.detailStepSelect.value = detailStepIndexes.includes(state.step) ? String(state.step) : "";
 
       renderStepMetrics(step);
-      renderTokenHighlights(step);
+      renderTokenStream(step);
       renderSelectedStep(step);
       renderPositionList(step, details);
       renderTables(getSelectedDetail(details));
@@ -736,7 +741,8 @@
       const rows = ids.map((id) => {
         const b = base.get(String(id));
         const s = shifted.get(String(id));
-        const label = tokenLabel(b || s || {token_id: id, token_text: ""});
+        const entry = (b && b.entry) || (s && s.entry) || {token_id: id, token_text: ""};
+        const label = tokenLabel(entry);
         const delta = b && s ? s.value - b.value : null;
         return `<tr>
           <td>${escapeHtml(label)}</td>
@@ -765,27 +771,47 @@
       </tr></thead><tbody>${rows}</tbody>`;
     }
 
-    function renderTokenStream() {
+    function renderTokenStream(step) {
+      const blockLength = Number(record.generation_config.block_length || genLength);
+      const currentBlock = Number(step.block_index || 0);
+      const visibleUntil = Math.min(genLength, (currentBlock + 1) * blockLength);
+      const revealedByPosition = new Map(generatedTokens.map((token) => [String(token.response_position), token]));
+      const currentPositions = new Set((step.transferred_positions || []).map((x) => String(x.response_position)));
+      const shiftedPositions = new Set((step.position_shift_summary || []).map((x) => String(x.response_position)));
       const promptHtml = promptTokens.map((token) => `<span class="token prompt">${escapeHtml(token)}</span>`).join("");
-      const genHtml = generatedTokens.map((token) => `<button class="token" data-step="${token.step}" data-position="${token.response_position}">${escapeHtml(token.token_text || "")}</button>`).join("");
-      el.tokenStream.innerHTML = promptHtml + genHtml;
+      const responseTokens = [];
+      for (let pos = 0; pos < visibleUntil; pos += 1) {
+        const token = revealedByPosition.get(String(pos));
+        const isRevealed = token && Number(token.step) <= state.step;
+        const classes = [
+          "token",
+          isRevealed ? "" : "mask",
+          isRevealed && Number(token.step) === state.step ? "current" : "",
+          currentPositions.has(String(pos)) ? "selected" : "",
+          shiftedPositions.has(String(pos)) ? "shifted" : "",
+        ].filter(Boolean).join(" ");
+        const revealStep = isRevealed ? ` data-reveal-step="${token.step}"` : "";
+        const label = isRevealed ? String(token.token_text || "") : "<M>";
+        responseTokens.push(
+          `<button class="${classes}" data-position="${pos}"${revealStep}>${escapeHtml(label)}</button>`
+        );
+      }
+      el.tokenStream.innerHTML = promptHtml + responseTokens.join("");
       for (const token of el.tokenStream.querySelectorAll("button.token")) {
         token.addEventListener("click", () => {
-          const step = Number(token.dataset.step);
+          const step = token.dataset.revealStep === undefined ? state.step : Number(token.dataset.revealStep);
           const pos = Number(token.dataset.position);
           setStep(step, `0:${promptTokenLength + pos}`);
         });
       }
-    }
-
-    function renderTokenHighlights(step) {
-      const currentPositions = new Set((step.transferred_positions || []).map((x) => String(x.response_position)));
-      const shiftedPositions = new Set((step.position_shift_summary || []).map((x) => String(x.response_position)));
-      for (const token of el.tokenStream.querySelectorAll("button.token")) {
-        token.classList.toggle("current", token.dataset.step === String(state.step));
-        token.classList.toggle("selected", currentPositions.has(token.dataset.position));
-        token.classList.toggle("shifted", shiftedPositions.has(token.dataset.position));
-      }
+      const revealedCount = generatedTokens.filter((token) => Number(token.step) <= state.step).length;
+      const numBlocks = Math.ceil(genLength / blockLength);
+      el.generationSummary.textContent = [
+        `Block ${currentBlock + 1}/${numBlocks}`,
+        `showing response positions 0-${visibleUntil - 1}`,
+        `${revealedCount}/${genLength} tokens revealed`,
+        "<M> marks unrevealed positions",
+      ].join(". ");
     }
 
     function renderRiskChart() {
@@ -933,8 +959,10 @@
     }
 
     function tokenLabel(entry) {
+      if (entry && entry.entry) entry = entry.entry;
       const text = String(entry.token_text || "").replace(/\n/g, "\\n").replace(/\t/g, "\\t");
-      return `${text || "<empty>"} #${entry.token_id}`;
+      const tokenId = entry.token_id === undefined ? "?" : entry.token_id;
+      return `${text || "<empty>"} #${tokenId}`;
     }
 
     function positionKey(detail) {
