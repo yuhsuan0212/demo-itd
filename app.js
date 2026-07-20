@@ -141,6 +141,7 @@
     el.eventSelect.addEventListener("change", () => {
       if (el.eventSelect.value !== "") setStep(Number(el.eventSelect.value));
     });
+    el.tokenStream.addEventListener("click", handleTokenClick);
     el.metricChart.addEventListener("click", (event) => jumpFromHorizontalEvent(event, el.metricChart));
     el.activityMap.addEventListener("click", (event) => jumpFromHorizontalEvent(event, el.activityMap));
     window.addEventListener("hashchange", () => {
@@ -630,20 +631,6 @@
       );
     }
     el.tokenStream.innerHTML = buttons.join("");
-    for (const button of el.tokenStream.querySelectorAll("button.token")) {
-      button.addEventListener("click", () => {
-        const position = Number(button.dataset.position);
-        const revealStep = Number(button.dataset.revealStep);
-        const token = tokensByPosition.get(String(position));
-        const key =
-          state.method === "redact"
-            ? token?.detail_key
-            : token
-              ? `0:${Number(state.record.prompt_token_length || inferPromptTokenLength(state.generatedTokens)) + position}`
-              : null;
-        setStep(revealStep, key);
-      });
-    }
 
     const revealedCount = state.generatedTokens.filter((token) => token.step <= state.step).length;
     const numBlocks = Math.ceil(genLength / blockLength);
@@ -655,6 +642,25 @@
       legendItem("var(--accent)", state.method === "redact" ? "current commit" : "shifted now"),
       state.method === "redact" ? legendItem("var(--safe)", "re-ranked token") : "",
     ].join("");
+  }
+
+  function handleTokenClick(event) {
+    const button = event.target.closest("button.token");
+    if (!button || !el.tokenStream.contains(button)) return;
+    const position = Number(button.dataset.position);
+    const revealStep = Number(button.dataset.revealStep);
+    const token = state.generatedTokens.find(
+      (item) => Number(item.response_position) === position
+    );
+    const key =
+      state.method === "redact"
+        ? token?.detail_key
+        : token
+          ? `0:${Number(
+              state.record.prompt_token_length || inferPromptTokenLength(state.generatedTokens)
+            ) + position}`
+          : null;
+    setStep(revealStep, key);
   }
 
   function buildGeneratedTokens(method, steps) {
@@ -899,7 +905,7 @@
   }
 
   function togglePlayback() {
-    if (state.timer) {
+    if (state.timer !== null) {
       stopPlayback();
       return;
     }
@@ -909,11 +915,12 @@
     state.timer = window.setInterval(() => {
       if (state.step >= state.steps.length - 1) stopPlayback();
       else setStep(state.step + 1);
-    }, 110);
+    }, 280);
+    setStep(state.step + 1);
   }
 
   function stopPlayback() {
-    if (state.timer) window.clearInterval(state.timer);
+    if (state.timer !== null) window.clearInterval(state.timer);
     state.timer = null;
     if (el.playSteps) {
       el.playSteps.innerHTML = '<span aria-hidden="true">▶</span> Play';
@@ -960,7 +967,8 @@
   function visibleToken(value) {
     const text = String(value ?? "");
     if (text === "") return "∅";
-    return text.replace(/\n/g, "↵").replace(/\t/g, "⇥").replace(/ /g, "␠");
+    if (/^ +$/.test(text)) return "space";
+    return text.replace(/^ +/, "").replace(/\n/g, "↵").replace(/\t/g, "⇥");
   }
 
   function chip(text, variant = "") {
