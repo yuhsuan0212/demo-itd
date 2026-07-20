@@ -57,7 +57,9 @@
       "thresholdValue",
       "baselineScore",
       "foScore",
+      "foQuality",
       "redactScore",
+      "redactQuality",
       "stepSlider",
       "stepValue",
       "prevStep",
@@ -233,6 +235,12 @@
     el.baselineScore.textContent = formatPercent(outcomes.baseline_toxicity);
     el.foScore.textContent = formatPercent(outcomes.fo_toxicity);
     el.redactScore.textContent = formatPercent(outcomes.redact_toxicity);
+    el.foQuality.textContent = `repeat-3 ${formatPercent(
+      outcomes.fo_degeneracy?.repeated_3gram_fraction
+    )}`;
+    el.redactQuality.textContent = `repeat-3 ${formatPercent(
+      outcomes.redact_degeneracy?.repeated_3gram_fraction
+    )}`;
     el.thresholdValue.textContent = formatNum(outcomes.toxic_threshold);
   }
 
@@ -735,18 +743,18 @@
       parts.push(
         `<path d="${area}" fill="${lane.fill}"/>`,
         `<polyline points="${points.join(" ")}" fill="none" stroke="${lane.color}" stroke-width="2" vector-effect="non-scaling-stroke"/>`,
-        `<text x="12" y="${top + 12}" fill="${lane.color}" font-size="10" font-family="ui-monospace,monospace">${escapeHtml(
+        `<text x="12" y="${top + 12}" fill="${lane.color}" font-size="12" font-family="ui-monospace,monospace">${escapeHtml(
           lane.label
         )}</text>`,
-        `<text x="12" y="${top + 27}" fill="#7b877f" font-size="8" font-family="ui-monospace,monospace">max ${escapeHtml(
+        `<text x="12" y="${top + 29}" fill="#7b877f" font-size="12" font-family="ui-monospace,monospace">max ${escapeHtml(
           formatNum(maximum)
         )}</text>`
       );
     });
     parts.push(
       `<line id="chartCursor" x1="${left}" y1="20" x2="${left}" y2="218" stroke="#17211d" stroke-width="1" stroke-dasharray="4 4"/>`,
-      `<text x="${left}" y="231" fill="#8a958f" font-size="8" font-family="ui-monospace,monospace">0</text>`,
-      `<text x="${width - right - 18}" y="231" fill="#8a958f" font-size="8" font-family="ui-monospace,monospace">255</text>`
+      `<text x="${left}" y="232" fill="#8a958f" font-size="12" font-family="ui-monospace,monospace">0</text>`,
+      `<text x="${width - right - 23}" y="232" fill="#8a958f" font-size="12" font-family="ui-monospace,monospace">255</text>`
     );
     el.metricChart.setAttribute("viewBox", `0 0 ${width} ${height}`);
     el.metricChart.dataset.left = String(left);

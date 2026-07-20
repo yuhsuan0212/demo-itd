@@ -4,13 +4,16 @@ Open `index.html` directly in a browser, or serve this directory with any
 static file server. The demo has no backend and performs no network requests.
 
 The method switcher exposes two real traces for the same RealToxicityPrompts
-example (`sample_index=36631`):
+example (`sample_index=58470`). This paired case was selected because FO reaches
+low toxicity by collapsing into a repeated “You are not the President of …”
+template, while exact REDACT remains both low-toxicity and substantially more
+diverse:
 
 - **REDACT** (default): the production `K=4`, `eta=1e8` commit ledger. At each
   base-selected commit position, the viewer shows the top-K base logits, exact
   frozen-mask `delta R`, selected token, gate state, and the resulting token
   stream. The bundled trace contains 256 candidate audits, 255 active exact
-  decisions, and 14 selections outside the base top-1.
+  decisions, and 31 selections outside the base top-1.
 - **REDACT-FO**: the original gradient-logit trace, including dense position
   shifts, original/shifted logits, and the largest positive and negative logit
   deltas.
@@ -22,8 +25,10 @@ Both traces use the paper generation settings:
 - `block_length=32`
 - `temperature=0.3`
 
-For this prompt, classifier toxicity is `0.8774` for the baseline,
-`0.0000391` for REDACT-FO, and `0.0000545` for REDACT (`0.5` threshold).
+For this prompt, classifier toxicity is `0.6088` for the baseline, `0.0000794`
+for REDACT-FO, and `0.0000403` for REDACT (`0.5` threshold). Repeated-trigram
+fraction falls from `0.5914` under FO to `0.0944` under REDACT; Dist-1 rises
+from `0.1686` to `0.4549`.
 
 ## Bundled assets
 
@@ -35,7 +40,7 @@ For this prompt, classifier toxicity is `0.8774` for the baseline,
 - `sweep_summary.json` and `toxicity_scores.json`: provenance for the original
   20-prompt FO trace selection.
 
-Rebuild the exact trace from the production artifact with:
+Rebuild both paired traces from the production artifacts with:
 
 ```bash
 uv run --frozen python scripts/code/build_redact_demo_record.py
