@@ -1,20 +1,62 @@
-# Gradient Logit Steering Trace Demo
+# REDACT Trace Explorer
 
-Open `index.html` directly in a browser, or serve this directory with any static file server. The page uses `record.js`, so it does not need a backend or JSON fetch permissions.
+Open `index.html` directly in a browser, or serve this directory with any
+static file server. The demo has no backend and performs no network requests.
 
-This bundled trace was selected from a random-20 prompt sweep. It uses the current original generation length settings:
+The method switcher exposes two real traces for the same RealToxicityPrompts
+example (`sample_index=36631`):
+
+- **REDACT** (default): the production `K=4`, `eta=1e8` commit ledger. At each
+  base-selected commit position, the viewer shows the top-K base logits, exact
+  frozen-mask `delta R`, selected token, gate state, and the resulting token
+  stream. The bundled trace contains 256 candidate audits, 255 active exact
+  decisions, and 14 selections outside the base top-1.
+- **REDACT-FO**: the original gradient-logit trace, including dense position
+  shifts, original/shifted logits, and the largest positive and negative logit
+  deltas.
+
+Both traces use the paper generation settings:
 
 - `steps=256`
 - `gen_length=256`
 - `block_length=32`
 - `temperature=0.3`
 
-The selected public demo trace is `sample_index=36631` from `seq09` of the sweep. It has nonzero logit shifting across all 8 generation blocks, with 235 shifted steps out of 256 and `max_abs_shift=12.818`.
+For this prompt, classifier toxicity is `0.8774` for the baseline,
+`0.0000391` for REDACT-FO, and `0.0000545` for REDACT (`0.5` threshold).
 
-This selected example changes from toxic to non-toxic under the same toxicity classifier used by evaluation:
+## Bundled assets
 
-- baseline toxicity: `0.8774`
-- gradient generation toxicity: `0.000039`
-- toxic threshold: `0.5`
+- `record.js`: slimmed REDACT-FO trace selected from the random-20 gradient
+  sweep under `output/gradient_viz/random20_sweep_20260604/`.
+- `record_redact.js`: exact REDACT trace extracted from
+  `output/commit_log_prod/llada_redact_k4/commit_log/` and paired with
+  `output/commit_log_prod/llada_redact_k4/toxicity_results.json`.
+- `sweep_summary.json` and `toxicity_scores.json`: provenance for the original
+  20-prompt FO trace selection.
 
-For a visible logit-shifting demo, the bundled trace uses `control.safety_margin=1.0`. The full unslimmed source trace is under `output/gradient_viz/random20_sweep_20260604/records_margin1_20260604-113431/`. The sweep summary is bundled as `sweep_summary.json`, and the 20-prompt toxicity rescoring table is bundled as `toxicity_scores.json`.
+Rebuild the exact trace from the production artifact with:
+
+```bash
+uv run --frozen python scripts/code/build_redact_demo_record.py
+```
+
+The builder defaults to a locally cached LLaDA tokenizer and refuses an
+implicit download. Pass `--allow-tokenizer-download` explicitly when rebuilding
+on a machine without that tokenizer cache.
+
+## GitHub Pages deployment
+
+The runtime is completely self-contained. Upload these five files together at
+the site root:
+
+- `index.html`
+- `styles.css`
+- `app.js`
+- `record.js` (REDACT-FO data)
+- `record_redact.js` (exact REDACT data)
+
+No additional JSON, model checkpoint, Python environment, or `output/` folder
+is needed. `sweep_summary.json` and `toxicity_scores.json` are optional FO
+provenance files; the website does not request them at runtime. Keeping this
+README in the repository is recommended but not required by the page.
